@@ -1,0 +1,5 @@
+# misc
+__pycache__
+.DS_Store
+.ipynb*
+.env
