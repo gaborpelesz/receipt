@@ -77,7 +77,6 @@ class ReceiptExtractor:
 
         corners = self.estimate_corners(biggest_contour)
 
-        x, y, w, h = cv2.boundingRect(corners)
         center, _, angle = cv2.minAreaRect(corners)
 
         smoothed_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
@@ -97,17 +96,19 @@ class ReceiptExtractor:
             smoothed_image = rotate([smoothed_image], 90)[0]
 
 
-        print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
+        # print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
 
-        window_size = (1500,1500)
-        cv2.namedWindow('show', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('show', window_size)
-        cv2.imshow('show', image)
-        cv2.namedWindow('smoothed_image', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('smoothed_image', window_size)
-        cv2.imshow('smoothed_image', smoothed_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # window_size = (1500,1500)
+        # cv2.namedWindow('show', cv2.WINDOW_NORMAL)
+        # cv2.resizeWindow('show', window_size)
+        # cv2.imshow('show', image)
+        # cv2.namedWindow('smoothed_image', cv2.WINDOW_NORMAL)
+        # cv2.resizeWindow('smoothed_image', window_size)
+        # cv2.imshow('smoothed_image', smoothed_image)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        return Receipt(smoothed_image)
 
 
 
