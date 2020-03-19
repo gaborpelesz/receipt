@@ -5,7 +5,7 @@ from flask import Flask, request, redirect, jsonify
 from flask_api import FlaskAPI, status
 
 app = FlaskAPI(__name__)
-extractor = ReceiptExtractor()
+
 
 @app.route('/process_receipt', methods=['POST'])
 def hello_world():

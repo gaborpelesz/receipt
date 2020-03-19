@@ -1,13 +1,30 @@
+import time
 import numpy as np
 import cv2
-from keras_segmentation.predict import model_from_checkpoint_path, predict
+import tensorflow as tf
 
-from app.receipt.processing import Receipt
+from keras_segmentation.predict import model_from_checkpoint_path
+from keras_segmentation.data_utils.data_loader import get_image_arr
+from keras_segmentation.models.config import IMAGE_ORDERING
+
+from receipt.processing import Receipt
 
 class ReceiptExtractor:
-    def __init__(self, segmentation_model_path='app/models/resnet50_unet_20200318'):
+    def __init__(self, segmentation_model_path='/home/peleszgabor/Desktop/projects/blokkos/alpha1.0/app/models/segmentation/resnet50_unet_20200318', use_gpu=False):
+        # TODO warmup neural network, if not the first prediction will be slow
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+
+        if not use_gpu:
+            tf.config.experimental.set_visible_devices([], 'GPU') # forces operations on CPU
+        #tf.debugging.set_log_device_placement(True) # logging for ensuring the operations are truly on the CPU
         self.model = model_from_checkpoint_path(segmentation_model_path)
-        pass
+        self._warmup()
+
+    def _warmup(self):
+        warmup_image = cv2.imread('app/models/warmup/warmup.jpg', 1)
+        _ = predict(model=self.model, image=warmup_image)
 
     def is_scanned(self, image):
         """Determines if an image is scanned or not.
@@ -46,33 +63,56 @@ class ReceiptExtractor:
         return Receipt(cropped_receipt) # create a new Receipt object
 
     def extract_by_segment(self, image):
-        segmentation_mask = segment_image(image)
+        """Extraction based on the segmented image. Segmentation
+        aims to segment the hole receipt on the image. At this stage
+        we assume that the image truly contains a receipt.
+        """
+        t_start = time.time()
+        segmentation_mask = self.segment_image(image)
 
         contours, _ = cv2.findContours(segmentation_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+        # Our best guess here is to operate with the biggest contour later on
+        biggest_contour = sorted(contours, key=lambda x: cv2.contourArea(x))[-1]
+
+        corners = self.estimate_corners(biggest_contour)
+
+        x, y, w, h = cv2.boundingRect(corners)
+        center, _, angle = cv2.minAreaRect(corners)
+
+        smoothed_mask = np.zeros_like(image)
+        cv2.drawContours(smoothed_mask, [cv2.convexHull(corners)], -1, (255,255,255), -1)
+
+        rotated_image = rotate(image, 270-angle, center)
+        rotated_mask = rotate(smoothed_mask, 270-angle, center)
+
+        contour = cv2.findContours(cv2.cvtColor(rotated_mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
+        x, y, w, h = cv2.boundingRect(contour)
+
+        rotated_mask = rotated_mask[y:y+h,x:x+w]
+        smoothed_image = cv2.bitwise_and(rotated_image[y:y+h,x:x+w], rotated_mask)
+
+        print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
+
+        window_size = (1500,1500)
+        cv2.namedWindow('show', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('show', window_size)
+        cv2.imshow('show', image)
+        cv2.namedWindow('smoothed_image', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('smoothed_image', window_size)
+        cv2.imshow('smoothed_image', smoothed_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
 
     def segment_image(self, image_to_segment):
         original_height, original_width = image_to_segment.shape[0], image_to_segment.shape[1] 
 
         # Making the prediction over the image with the trained model
-        pr = predict(
-            model=model, 
-            inp=image_to_segment
-            )
+        pr = predict(model=self.model, image=image_to_segment)
 
-        # Transforming the prediction mask so that it can be blended with
-        #   the original image
-        seg_img = np.zeros((240, 176, 3), dtype=np.uint8)
-        colors = [
-            (0,0,0),
-            (255, 255, 255),
-        ]
-
-        for c in range(2):
-            seg_img[:, :, 0] += ((pr[:, :] == c)*(colors[c][0])).astype('uint8')
-            seg_img[:, :, 1] += ((pr[:, :] == c)*(colors[c][1])).astype('uint8')
-            seg_img[:, :, 2] += ((pr[:, :] == c)*(colors[c][2])).astype('uint8')
-
+        seg_img = np.zeros((240, 176), dtype=np.uint8)
+        seg_img[:, :] += ((pr == 1)*(255)).astype('uint8')
         seg_img = cv2.resize(seg_img, (original_width, original_height))
 
         return seg_img
@@ -80,11 +120,42 @@ class ReceiptExtractor:
     def extract_by_text(self):
         pass
 
-    def estimate_corners(self):
-        pass
-
     # TODO not sure perspective transform is needed yet
     def perspective_transform(self):
         """Extracts an object from an image by 4 corner points.
         """
         pass
+
+    def estimate_corners(self, cnt):
+        epsilon = 0.01*cv2.arcLength(cnt,True)
+        approx = cv2.approxPolyDP(cnt,epsilon,True)
+        approx = np.array([a[0] for a in approx])
+
+        return approx
+
+def predict(model=None , image=None , out_fname=None):
+    output_width = model.output_width
+    output_height  = model.output_height
+    input_width = model.input_width
+    input_height = model.input_height
+    n_classes = model.n_classes
+
+    x = get_image_arr( image , input_width  , input_height , odering=IMAGE_ORDERING )
+    pr = model.predict( np.array([x]) )[0]
+    pr = pr.reshape(( output_height ,  output_width , n_classes ) ).argmax( axis=2 )
+
+    return pr
+
+
+def rotate(image, angle, center):
+    (h, w) = image.shape[:2]
+    M = cv2.getRotationMatrix2D(center, -angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+    M[0, 2] += (nW / 2) - center[0]
+    M[1, 2] += (nH / 2) - center[1]
+
+    # perform the actual rotation and return the image
+    return cv2.warpAffine(image, M, (nW, nH))
