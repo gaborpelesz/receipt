@@ -18,7 +18,7 @@ class ReceiptExtractor:
 
         if not use_gpu:
             tf.config.experimental.set_visible_devices([], 'GPU') # forces operations on CPU
-        #tf.debugging.set_log_device_placement(True) # logging for ensuring the operations are truly on the CPU
+
         self.model = model_from_checkpoint_path(segmentation_model_path)
         self._warmup()
 
@@ -68,6 +68,7 @@ class ReceiptExtractor:
         we assume that the image truly contains a receipt.
         """
         t_start = time.time()
+        
         segmentation_mask = self.segment_image(image)
 
         contours, _ = cv2.findContours(segmentation_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -79,16 +80,16 @@ class ReceiptExtractor:
         x, y, w, h = cv2.boundingRect(corners)
         center, _, angle = cv2.minAreaRect(corners)
 
-        smoothed_mask = np.zeros_like(image)
-        cv2.drawContours(smoothed_mask, [cv2.convexHull(corners)], -1, (255,255,255), -1)
+        smoothed_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+        cv2.drawContours(smoothed_mask, [cv2.convexHull(corners)], -1, 255, -1)
 
-        rotated_image = rotate(image, 270-angle, center)
-        rotated_mask = rotate(smoothed_mask, 270-angle, center)
+        rotated_image, rotated_mask = rotate([image, smoothed_mask], 270-angle, center)
 
-        contour = cv2.findContours(cv2.cvtColor(rotated_mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
+        contour = cv2.findContours(rotated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
         x, y, w, h = cv2.boundingRect(contour)
 
         rotated_mask = rotated_mask[y:y+h,x:x+w]
+        rotated_mask = cv2.cvtColor(rotated_mask, cv2.COLOR_GRAY2BGR)
         smoothed_image = cv2.bitwise_and(rotated_image[y:y+h,x:x+w], rotated_mask)
 
         print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
@@ -147,9 +148,10 @@ def predict(model=None , image=None , out_fname=None):
     return pr
 
 
-def rotate(image, angle, center):
-    (h, w) = image.shape[:2]
+def rotate(images, angle, center):
+    (h, w) = images[0].shape[:2]
     M = cv2.getRotationMatrix2D(center, -angle, 1.0)
+    M_inv = cv2.getRotationMatrix2D(center, angle, 1.0)
     cos = np.abs(M[0, 0])
     sin = np.abs(M[0, 1])
     nW = int((h * sin) + (w * cos))
@@ -157,5 +159,5 @@ def rotate(image, angle, center):
     M[0, 2] += (nW / 2) - center[0]
     M[1, 2] += (nH / 2) - center[1]
 
-    # perform the actual rotation and return the image
-    return cv2.warpAffine(image, M, (nW, nH))
+    # perform the actual rotation and return the images
+    return [cv2.warpAffine(image, M, (nW, nH)) for image in images]
