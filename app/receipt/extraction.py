@@ -68,7 +68,7 @@ class ReceiptExtractor:
         we assume that the image truly contains a receipt.
         """
         t_start = time.time()
-        
+
         segmentation_mask = self.segment_image(image)
 
         contours, _ = cv2.findContours(segmentation_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -91,6 +91,11 @@ class ReceiptExtractor:
         rotated_mask = rotated_mask[y:y+h,x:x+w]
         rotated_mask = cv2.cvtColor(rotated_mask, cv2.COLOR_GRAY2BGR)
         smoothed_image = cv2.bitwise_and(rotated_image[y:y+h,x:x+w], rotated_mask)
+
+        # If width is greater than height we rotate 90 clockwise
+        if smoothed_image.shape[1] > smoothed_image.shape[0]:
+            smoothed_image = rotate([smoothed_image], 90)[0]
+
 
         print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
 
@@ -148,7 +153,10 @@ def predict(model=None , image=None , out_fname=None):
     return pr
 
 
-def rotate(images, angle, center):
+def rotate(images, angle, center=None):
+    if center is None:
+        center = (images[0].shape[1]//2, images[0].shape[0]//2)
+
     (h, w) = images[0].shape[:2]
     M = cv2.getRotationMatrix2D(center, -angle, 1.0)
     M_inv = cv2.getRotationMatrix2D(center, angle, 1.0)
