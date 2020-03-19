@@ -26,15 +26,15 @@ class Receipt():
     def get_text(self, text_images):
         image = text_images
 
-        t_start = time.time()
-        config='--psm 8'
+        # t_start = time.time()
+        config = '--psm 8 --oem 1'
         ocr_text = pytesseract.image_to_string(image, config=config)
-        print(f'ocr: {(time.time()-t_start)*1000:.3f} ms')
+        # print(f'OCR: {(time.time()-t_start)*1000:.3f} ms')
 
         with open('test.txt', 'w') as f:
             f.write(ocr_text)
 
-    def find_text(self):
+    def find_text(self, DEBUG=False):
         img = self.cropped_receipt[3*self.cropped_receipt.shape[0]//4:, :]
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -74,6 +74,7 @@ class Receipt():
   
 
         text_images = []
+        smoothed_image = None
         for text_box in text_boxes[:10]:
             angle = -text_box[0][2] if text_box[0][2] > -45 else 270-text_box[0][2]
 
@@ -89,11 +90,6 @@ class Receipt():
             
             text_images.append(smoothed_image)
 
-
-        cv2.namedWindow('rotated', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('rotated', (1500,1500))
-        cv2.imshow('rotated', smoothed_image)
-
         for i, text_box in enumerate(text_boxes):
             box = cv2.boxPoints(text_box[0])
             box = np.int0(box)
@@ -101,16 +97,23 @@ class Receipt():
             img = cv2.putText(img, f'{i+1}', tuple(box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
             cv2.drawContours(img,[box],0,(0,0,255),2)
 
-        cv2.namedWindow('grad', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('grad', 1200,1000)
-        cv2.imshow('grad', grad)
-        cv2.namedWindow('connected', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('connected', 1200,1000)
-        cv2.imshow('connected', connected)
-        cv2.namedWindow('show', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('show', (1500,1500))
-        cv2.imshow('show', img)
-        return text_images
+        if DEBUG:
+            if smoothed_image is not None:
+                cv2.namedWindow('rotated', cv2.WINDOW_NORMAL)
+                cv2.resizeWindow('rotated', (1500,1500))
+                cv2.imshow('rotated', smoothed_image)
+
+
+            cv2.namedWindow('grad', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('grad', 1200,1000)
+            cv2.imshow('grad', grad)
+            cv2.namedWindow('connected', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('connected', 1200,1000)
+            cv2.imshow('connected', connected)
+            cv2.namedWindow('show', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('show', (1500,1500))
+            cv2.imshow('show', self.cropped_receipt)
+        return text_images, img
 
 
 def rotate(images, angle, center=None):
