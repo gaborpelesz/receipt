@@ -1,3 +1,8 @@
+test.py
+
+# exclude models
+models
+
 # misc
 __pycache__
 .DS_Store
