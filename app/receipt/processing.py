@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 import pytesseract
-import multiprocessing
+import re
 
 import config
 from utils.rotate import rotate
@@ -11,6 +11,24 @@ class Receipt():
     def __init__(self, cropped_receipt):
         self.date, self.AP = "?", "?"
         self.cropped_receipt = cropped_receipt
+
+    def _post_process_AP(self, AP_code):
+        if len(AP_code) < 8:
+            return AP_code
+        print('before post process:', AP_code)
+        last_digit_idx = re.match('.+([0-9])[^0-9]*$', AP_code).start(1)
+
+        post_processed = AP_code[last_digit_idx-7:last_digit_idx+1]
+        post_processed = post_processed.replace('Q', '0')
+        post_processed = post_processed.replace('A', '4')
+        post_processed = post_processed.replace('G', '6')
+
+        return 'A' + post_processed
+
+    def _post_process_date(self, date):
+        post_processed = date
+        post_processed.replace(',', '.')
+        return date
 
     def get_date_and_AP(self):
 
@@ -31,10 +49,10 @@ class Receipt():
                 break
 
         ocr_start = time.time()
-        self.AP = image_word_to_string(AP_candidate)
+        self.AP = self._post_process_AP(image_word_to_string(AP_candidate))
 
         if date_candidate is not None:
-            self.date = image_word_to_string(date_candidate)
+            self.date = self._post_process_date(image_word_to_string(date_candidate))
         ocr_end = time.time()
         print(f'     AP code: {self.AP}')
         print(f'        date: {self.date}')
@@ -127,6 +145,11 @@ class Receipt():
 
                 image = cv2.putText(image, f'{i+1}', tuple(box[0]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
                 cv2.drawContours(image,[box],0,(0,0,255),2)
+
+            for i, text_image in enumerate(text_images[:10]):
+                cv2.namedWindow(f'text image {i+1}', cv2.WINDOW_NORMAL)
+                cv2.resizeWindow(f'text image {i+1}', 1200,1000)
+                cv2.imshow(f'text image {i+1}', text_image[0])
 
             cv2.namedWindow('text boxes', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('text boxes', 1200,1000)
