@@ -120,11 +120,9 @@ class Receipt():
     def find_text(self, image):
         im_height, im_width = image.shape[:2]
 
-
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         grad = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
-
 
         _, bw = cv2.threshold(grad, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
@@ -152,7 +150,6 @@ class Receipt():
                 smoothed_mask = cv2.dilate(text_mask, kernel=np.ones((4,4),dtype=np.uint8), iterations=4)
                 text_boxes.append((rect, smoothed_mask))
   
-
         text_images = []
         smoothed_image = None
         for text_box in text_boxes:
@@ -171,7 +168,6 @@ class Receipt():
             position = (text_box[0][0][0], text_box[0][0][1]) # text center position on the image
 
             text_images.append((smoothed_image, position))
-
 
         if config.DEBUG:
             for i, text_box in enumerate(text_boxes):
