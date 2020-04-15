@@ -55,7 +55,10 @@ class Receipt():
         image = self.cropped_receipt[3*self.cropped_receipt.shape[0]//4:, :]
         image_height, image_width = image.shape[:2]
 
+        print('\tFind textboxes...')
+        t0_textbox = time.time()
         text_images = ocr.find_text(image)
+        print(f'\tTextboxes found. ({(time.time()-t0_textbox)*1000:.2f}ms)')
 
         if len(text_images) == 0:
             return "?", "?"
@@ -68,6 +71,7 @@ class Receipt():
                 date_candidate = text_image[0]
                 break
 
+        print('\tStart OCR...')
         ocr_start = time.time()
         raw_AP = ocr.image_word_to_string(AP_candidate)
         self.AP = self._post_process_AP(raw_AP)
@@ -79,14 +83,14 @@ class Receipt():
             self.date = self._post_process_date(raw_date)
         ocr_end = time.time()
 
-        print('before postprocess')
-        print(f'\tAP code: {raw_AP}')
-        print(f'\t   date: {raw_date}')
+        print('\tbefore postprocess')
+        print(f'\t\tAP code: {raw_AP}')
+        print(f'\t\t   date: {raw_date}')
 
-        print('after postprocess')
-        print(f'\tAP code: {self.AP}')
-        print(f'\t   date: {self.date}')
+        print('\tafter postprocess')
+        print(f'\t\tAP code: {self.AP}')
+        print(f'\t\t   date: {self.date}')
         
-        print(f'ocr runtime: {(ocr_end-ocr_start)*1000:.2f}ms') # time
+        print(f'\tFinished OCR. ({(ocr_end-ocr_start)*1000:.2f}ms)') # time
         
         return self.date, self.AP
