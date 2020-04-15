@@ -152,6 +152,7 @@ class ReceiptExtractor:
 
         return approx
 
+# ligthweight implementation of keras_segmentation predict function
 def predict(model=None , image=None , out_fname=None):
     output_width = model.output_width
     output_height  = model.output_height
