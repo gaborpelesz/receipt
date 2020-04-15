@@ -4,7 +4,7 @@ import cv2
 import tensorflow as tf
 
 from keras_segmentation.predict import model_from_checkpoint_path
-from keras_segmentation.data_utils.data_loader import get_image_arr
+from keras_segmentation.data_utils.data_loader import get_image_array
 from keras_segmentation.models.config import IMAGE_ORDERING
 
 from receipt.processing import Receipt
@@ -58,14 +58,14 @@ class ReceiptExtractor:
         cropped_receipt = None
 
         if self.is_scanned(image):
-            print("The image looks like it was scanned.")
-            print("Text search based receipt extraction begin...")
+            print("\tThe image looks like it was scanned.")
+            print("\tText search based receipt extraction begin...")
             cropped_receipt = self._extract_by_text_search(image)
         else:
             t0 = time.time()
-            print("Receipt segmentation with U-net begins...")
+            print("\tReceipt segmentation with U-net begins...")
             cropped_receipt = self._extract_by_segment(image)
-            print(f"Finished segmentation. ({(time.time()-t0)*1000:.2f}ms)")
+            print(f"\tFinished segmentation. ({(time.time()-t0)*1000:.2f}ms)")
 
         return Receipt(cropped_receipt) # create a new Receipt object
 
@@ -137,7 +137,7 @@ class ReceiptExtractor:
 
     def _extract_by_text_search(self):
         # TODO implement text extraction
-        raise NotImplementedError
+        return None
 
     # TODO not sure perspective transform is needed yet
     def perspective_transform(self):
@@ -160,7 +160,7 @@ def predict(model=None , image=None , out_fname=None):
     input_height = model.input_height
     n_classes = model.n_classes
 
-    x = get_image_arr( image , input_width  , input_height , odering=IMAGE_ORDERING )
+    x = get_image_array( image , input_width  , input_height , ordering=IMAGE_ORDERING )
     pr = model.predict( np.array([x]) )[0]
     pr = pr.reshape(( output_height ,  output_width , n_classes ) ).argmax( axis=2 )
 
