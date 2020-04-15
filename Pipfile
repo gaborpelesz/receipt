@@ -8,15 +8,14 @@ jupyter = "*"
 notebook = "*"
 
 [packages]
-opencv-python = "*"
-keras-segmentation = "*"
-keras = "*"
-tqdm = "*"
+opencv-python = "==4.2.0.34"
+keras = "==2.3.1"
+tqdm = "==4.45.0"
 tensorflow = "==2.1.0"
-python-dotenv = "*"
-flask = "*"
-flask-api = "*"
-pytesseract = "*"
+flask = "==1.1.2"
+flask-api = "==2.0"
+pytesseract = "0.3.3"
+keras-segmentation = "==0.3.0"
 
 [requires]
 python_version = "3.7"
