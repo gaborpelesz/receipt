@@ -15,20 +15,45 @@ class Receipt():
     def _post_process_AP(self, AP_code):
         if len(AP_code) < 8:
             return AP_code
-        print('before post process:', AP_code)
-        last_digit_idx = re.match('.+([0-9])[^0-9]*$', AP_code).start(1)
-
-        post_processed = AP_code[last_digit_idx-7:last_digit_idx+1]
+        
+        post_processed = AP_code
         post_processed = post_processed.replace('Q', '0')
         post_processed = post_processed.replace('A', '4')
         post_processed = post_processed.replace('G', '6')
+
+        match = re.match('.+([0-9])[^0-9]*$', AP_code)
+
+        if match is None:
+            return post_processed
+
+        last_digit_idx = match.start(1)
+
+        post_processed = AP_code[last_digit_idx-7:last_digit_idx+1]
 
         return 'A' + post_processed
 
     def _post_process_date(self, date):
         post_processed = date
-        post_processed.replace(',', '.')
-        return date
+
+        post_processed = post_processed.replace('Q', '0')
+        post_processed = post_processed.replace('A', '4')
+        post_processed = post_processed.replace('G', '6')
+
+        date_candidate = re.findall('([0-9]{0,2})', post_processed)
+
+        if date_candidate is None:
+            return post_processed
+
+        date_candidate = [i for i in date_candidate if i] # remove empty strings
+
+        if len(date_candidate) < 3:
+            return post_processed
+
+        date_candidate = date_candidate[-3:] 
+
+        # if found then the date will be in form: [year, month, day] where 'year' has only the last two digits
+        # assuming that this application will not be used in 2100<
+        return f'20{date_candidate[0]}.{date_candidate[1]}.{date_candidate[2]}.'
 
     def get_date_and_AP(self):
 
@@ -49,13 +74,23 @@ class Receipt():
                 break
 
         ocr_start = time.time()
-        self.AP = self._post_process_AP(image_word_to_string(AP_candidate))
+        raw_AP = image_word_to_string(AP_candidate)
+        self.AP = self._post_process_AP(raw_AP)
+
+        raw_date = ""
 
         if date_candidate is not None:
-            self.date = self._post_process_date(image_word_to_string(date_candidate))
+            raw_date = image_word_to_string(date_candidate)
+            self.date = self._post_process_date(raw_date)
         ocr_end = time.time()
-        print(f'     AP code: {self.AP}')
-        print(f'        date: {self.date}')
+
+        print('before postprocess')
+        print(f'\tAP code: {raw_AP}')
+        print(f'\t   date: {raw_date}')
+
+        print('after postprocess')
+        print(f'\tAP code: {self.AP}')
+        print(f'\t   date: {self.date}')
         
         print(f'ocr runtime: {(ocr_end-ocr_start)*1000:.2f}ms') # time
         
@@ -106,8 +141,8 @@ class Receipt():
             mask[y:y+h, x:x+w] = 0
             cv2.drawContours(mask, contours, idx, (255, 255, 255), -1)
             r = float(cv2.countNonZero(mask[y:y+h, x:x+w])) / (w * h)
-
-            if r > 0.30 and w/im_width > 0.08 and h > 16:
+            
+            if r > 0.4 and w/im_width > 0.08 and h/im_height > 0.02:
                 rect = cv2.minAreaRect(contours[idx])
 
                 text_mask = np.zeros(image.shape[:2], dtype=np.uint8)
