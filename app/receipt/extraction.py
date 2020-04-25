@@ -73,11 +73,19 @@ class ReceiptExtractor:
             if config.VERBOSE:
                 print(f"\tFinished segmentation. ({self.runtime_segment:.2f}ms)")
 
+        if config.DEBUG:
+            cv2.namedWindow('original', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('original', 1200, 1000)
+            cv2.imshow('original', image)
+            cv2.namedWindow('segmented', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('segmented', 1200, 1000)
+            cv2.imshow('segmented', cropped_receipt)
+
         return Receipt(cropped_receipt) # create a new Receipt object
 
     def _extract_by_segment(self, image):
         """Extraction based on the segmented image. Segmentation
-        aims to segment the hole receipt on the image. At this stage
+        aims to segment the hole receipt from the image. At this stage
         we assume that the image truly contains a receipt, with a distinct
         background.
         """
@@ -86,7 +94,7 @@ class ReceiptExtractor:
         segmentation_mask = self._segment_image(image)
 
         contours, _ = cv2.findContours(segmentation_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # Our best guess here is to operate with the biggest contour later on
+        # Our best guess here is to operate with the biggest contour
         biggest_contour = sorted(contours, key=lambda x: cv2.contourArea(x))[-1]
 
         corners = self.estimate_corners(biggest_contour)
