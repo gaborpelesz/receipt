@@ -61,5 +61,5 @@ def process_receipt():
 
 
 if __name__ == '__main__':
-    # threaded=false because if not then tensorflow would cry
+    # threaded=false because if not the Flask would lock threads before tensorflow
     app.run(host='0.0.0.0', port=3000, threaded=False)
