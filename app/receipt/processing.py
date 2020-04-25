@@ -34,7 +34,7 @@ class Receipt():
         post_processed = post_processed.replace('S', '5')
         post_processed = post_processed.replace('b', '6')
 
-        match = re.match('.+([0-9])[^0-9]*$', AP_code)
+        match = re.match('.+([0-9])[^0-9]*$', post_processed)
 
         if match is None:
             return post_processed
