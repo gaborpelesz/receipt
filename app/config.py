@@ -1,2 +1,3 @@
 DEBUG=False
 GPU=False
+VERBOSE=False
