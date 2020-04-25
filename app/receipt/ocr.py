@@ -55,7 +55,7 @@ def find_text(image):
         
         position = (text_box[0][0][0], text_box[0][0][1]) # center of the textbox on the image
 
-        text_images.append((smoothed_image, position))
+        text_images.append((cv2.cvtColor(smoothed_image, cv2.COLOR_BGR2GRAY), position))
 
     if config.DEBUG:
         for i, text_box in enumerate(text_boxes):
@@ -88,5 +88,5 @@ def find_text(image):
     return text_images
 
 def image_word_to_string(text_image):
-    tesseract_single_word_config = '--psm 8 --oem 1'
+    tesseract_single_word_config = '--psm 13 --oem 1'
     return pytesseract.image_to_string(text_image, config=tesseract_single_word_config)

@@ -7,6 +7,7 @@ from keras_segmentation.predict import model_from_checkpoint_path
 from keras_segmentation.data_utils.data_loader import get_image_array
 from keras_segmentation.models.config import IMAGE_ORDERING
 
+import config
 from receipt.processing import Receipt
 from utils.rotate import rotate
 
@@ -58,14 +59,19 @@ class ReceiptExtractor:
         cropped_receipt = None
 
         if self.is_scanned(image):
-            print("\tThe image looks like it was scanned.")
-            print("\tText search based receipt extraction begin...")
+            if config.VERBOSE:
+                print("\tThe image looks like it was scanned.")
+                print("\tText search based receipt extraction begin...")
             cropped_receipt = self._extract_by_text_search(image)
         else:
-            t0 = time.time()
-            print("\tReceipt segmentation with U-net begins...")
+            t0_segment = time.time()
+            if config.VERBOSE:
+                print("\tReceipt segmentation with U-net begins...")
             cropped_receipt = self._extract_by_segment(image)
-            print(f"\tFinished segmentation. ({(time.time()-t0)*1000:.2f}ms)")
+            td_segment = time.time()
+            self.runtime_segment = (td_segment-t0_segment)*1000
+            if config.VERBOSE:
+                print(f"\tFinished segmentation. ({self.runtime_segment:.2f}ms)")
 
         return Receipt(cropped_receipt) # create a new Receipt object
 
@@ -135,9 +141,9 @@ class ReceiptExtractor:
 
         return seg_img
 
-    def _extract_by_text_search(self):
+    def _extract_by_text_search(self, image):
         # TODO implement text extraction
-        return None
+        return image
 
     # TODO not sure perspective transform is needed yet
     def perspective_transform(self):
