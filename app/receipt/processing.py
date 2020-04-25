@@ -1,12 +1,17 @@
 import time
 import re
+import cv2
 
+import config
 from receipt import ocr
 
 class Receipt():
     def __init__(self, cropped_receipt):
         self.date, self.AP = "?", "?"
         self.cropped_receipt = cropped_receipt
+
+        self.runtime_ocr = 0
+        self.runtime_findtext = 0
 
     def _post_process_AP(self, AP_code):
         if len(AP_code) < 8:
@@ -15,7 +20,19 @@ class Receipt():
         post_processed = AP_code
         post_processed = post_processed.replace('Q', '0')
         post_processed = post_processed.replace('A', '4')
+        post_processed = post_processed.replace('B', '3')
         post_processed = post_processed.replace('G', '6')
+        post_processed = post_processed.replace('V', '0')
+        post_processed = post_processed.replace('N', '0')
+        post_processed = post_processed.replace('L', '1')
+        post_processed = post_processed.replace('?', '1')
+        post_processed = post_processed.replace('D', '0')
+        post_processed = post_processed.replace('d', '0')
+        post_processed = post_processed.replace('O', '0')
+        post_processed = post_processed.replace('§', '5')
+        post_processed = post_processed.replace('I', '1')
+        post_processed = post_processed.replace('S', '5')
+        post_processed = post_processed.replace('b', '6')
 
         match = re.match('.+([0-9])[^0-9]*$', AP_code)
 
@@ -24,7 +41,7 @@ class Receipt():
 
         last_digit_idx = match.start(1)
 
-        post_processed = AP_code[last_digit_idx-7:last_digit_idx+1]
+        post_processed = post_processed[last_digit_idx-7:last_digit_idx+1]
 
         return 'A' + post_processed
 
@@ -55,10 +72,14 @@ class Receipt():
         image = self.cropped_receipt[3*self.cropped_receipt.shape[0]//4:, :]
         image_height, image_width = image.shape[:2]
 
-        print('\tFind textboxes...')
+        if config.VERBOSE:
+            print('\tFind textboxes...')
         t0_textbox = time.time()
         text_images = ocr.find_text(image)
-        print(f'\tTextboxes found. ({(time.time()-t0_textbox)*1000:.2f}ms)')
+        td_textbox = time.time()
+        self.runtime_findtext = (td_textbox-t0_textbox)*1000
+        if config.VERBOSE:
+            print(f'\tTextboxes found. ({self.runtime_findtext:.2f}ms)')
 
         if len(text_images) == 0:
             return "?", "?"
@@ -71,7 +92,8 @@ class Receipt():
                 date_candidate = text_image[0]
                 break
 
-        print('\tStart OCR...')
+        if config.VERBOSE:
+            print('\tStart OCR...')
         ocr_start = time.time()
         raw_AP = ocr.image_word_to_string(AP_candidate)
         self.AP = self._post_process_AP(raw_AP)
@@ -82,15 +104,17 @@ class Receipt():
             raw_date = ocr.image_word_to_string(date_candidate)
             self.date = self._post_process_date(raw_date)
         ocr_end = time.time()
+        self.runtime_ocr = (ocr_end-ocr_start)*1000
 
-        print('\tbefore postprocess')
-        print(f'\t\tAP code: {raw_AP}')
-        print(f'\t\t   date: {raw_date}')
+        if config.VERBOSE:
+            print('\tbefore postprocess')
+            print(f'\t\tAP code: {raw_AP}')
+            print(f'\t\t   date: {raw_date}')
 
-        print('\tafter postprocess')
-        print(f'\t\tAP code: {self.AP}')
-        print(f'\t\t   date: {self.date}')
-        
-        print(f'\tFinished OCR. ({(ocr_end-ocr_start)*1000:.2f}ms)') # time
+            print('\tafter postprocess')
+            print(f'\t\tAP code: {self.AP}')
+            print(f'\t\t   date: {self.date}')
+            
+            print(f'\tFinished OCR. ({self.runtime_ocr:.2f}ms)') # time
         
         return self.date, self.AP
