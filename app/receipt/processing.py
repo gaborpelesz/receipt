@@ -18,21 +18,22 @@ class Receipt():
             return AP_code
         
         post_processed = AP_code
-        post_processed = post_processed.replace('Q', '0')
-        post_processed = post_processed.replace('A', '4')
-        post_processed = post_processed.replace('B', '3')
-        post_processed = post_processed.replace('G', '6')
-        post_processed = post_processed.replace('V', '0')
-        post_processed = post_processed.replace('N', '0')
-        post_processed = post_processed.replace('L', '1')
-        post_processed = post_processed.replace('?', '1')
-        post_processed = post_processed.replace('D', '0')
         post_processed = post_processed.replace('d', '0')
+        post_processed = post_processed.replace('D', '0')
+        post_processed = post_processed.replace('N', '0')
         post_processed = post_processed.replace('O', '0')
-        post_processed = post_processed.replace('§', '5')
+        post_processed = post_processed.replace('Q', '0')
+        post_processed = post_processed.replace('V', '0')
         post_processed = post_processed.replace('I', '1')
+        post_processed = post_processed.replace('L', '1')
+        post_processed = post_processed.replace('T', '1')
+        post_processed = post_processed.replace('?', '1')
+        post_processed = post_processed.replace('B', '3')
+        post_processed = post_processed.replace('A', '4')
         post_processed = post_processed.replace('S', '5')
+        post_processed = post_processed.replace('§', '5')
         post_processed = post_processed.replace('b', '6')
+        post_processed = post_processed.replace('G', '6')
 
         match = re.match('.+([0-9])[^0-9]*$', post_processed)
 
