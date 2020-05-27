@@ -34,4 +34,16 @@ Available arguments:
 * `--gpu`: To use the available GPU of the system.
 * `--gen-regression`: To generate a regression test file from the results of the testing.
 
+## Examples
+
+Default test all with regression on gpu.
+```bash
+python app/test.py -R --gpu
+```
+
+Test one image on gpu
+```
+pytohn app/test.py --gpu -S <image-path>
+```
+
 © gaborpelesz 2020

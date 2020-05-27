@@ -1,6 +1,6 @@
 import os
 import argparse
-import time
+import time as chrono
 import multiprocessing
 
 import cv2
@@ -8,6 +8,7 @@ import numpy as np
 
 import config
 from receipt.extraction import ReceiptExtractor
+from receipt.text.detector import load_text_detection_nets
 
 
 def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_and_data/data/testing/test_set', 
@@ -44,14 +45,14 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
         labels = dict(map(lambda x: (x.split(',')[0], x.split(',')[1:]), f.read().split('\n')))
     
     extractor = ReceiptExtractor(use_gpu=use_gpu)
-
+    load_text_detection_nets()
 
     image_names = os.listdir(test_folder_path)
     num_of_images = len(image_names)
 
     # TEST START
     for i, image_name in enumerate(image_names):
-        print(f'Testing: {i+1}/{num_of_images}', end='\r')
+        print(f"{f'Testing: {i+1}/{num_of_images} -> {image_name}':40}", end='\r')
 
         if not os.path.exists(os.path.join(test_folder_path, image_name)):
             print('')
@@ -66,16 +67,28 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
             print('Continue...')
             continue
 
-        receipt = extractor.extract_receipt(image)
-        date, AP = receipt.get_date_and_AP()
+        try:
+            receipt = extractor.extract_receipt(image)
+            receipt.process()
 
-        if extractor.runtime_segment != 0 and receipt.runtime_findtext != 0 and receipt.runtime_ocr != 0:
-            runtimes.append([extractor.runtime_segment, receipt.runtime_findtext, receipt.runtime_ocr])
+            runtime_ocr_t0 = chrono.time()
+
+            AP = receipt.get_AP()
+            date = receipt.get_date()
+            time = receipt.get_time()
+
+            runtime_ocr = (chrono.time() - runtime_ocr_t0)*1000
+        except Exception as e:
+            print(e)
+            raise Exception(f'Error occured while processing: {image_name}')
+
+        if extractor.runtime_segment != 0 and receipt.runtime_findtext != 0 and runtime_ocr != 0:
+            runtimes.append([extractor.runtime_segment, receipt.runtime_findtext, runtime_ocr])
 
         ground_truth = labels[image_name.split('.')[0]] # get rid of the file extension
         
-        if AP != ground_truth[0] or date != ground_truth[1]:
-            failed_case = (image_name, (AP, ground_truth[0]), (date, ground_truth[1]))
+        if AP != ground_truth[0] or date != ground_truth[1] or time != ground_truth[2]:
+            failed_case = (image_name, (AP, ground_truth[0]), (date, ground_truth[1]), (time, ground_truth[2]))
             failed_cases.append(failed_case)
             if regression_test_path is not None and image_name in regression_set:
                 regression_test_failed_cases.append(failed_case)
@@ -86,7 +99,7 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
     num_of_failed_cases = len(failed_cases)
     print('') # new line
 
-    ts = time.localtime() # timestamp struct
+    ts = chrono.localtime() # timestamp struct
     test_result_file_name = f'{ts.tm_year}{ts.tm_mon:02}{ts.tm_mday:02}{ts.tm_hour:02}{ts.tm_min:02}{ts.tm_sec:02}'
 
     rt_extraction, rt_textsearch, rt_ocr = np.mean(runtimes, axis=0) # runtime results
@@ -113,7 +126,8 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
             row = f"""Failed case: {failed_case[0]}
             \t     \tresult    \tground truth
             \t  AP:\t{failed_case[1][0]}\t{failed_case[1][1]}
-            \tdate:\t{failed_case[2][0]}\t{failed_case[2][1]}"""
+            \tdate:\t{failed_case[2][0]}\t{failed_case[2][1]}
+            \ttime:\t{failed_case[3][0]}\t{failed_case[3][1]}"""
             file_string.append(row)
         f.write(statistics_print + '\n'.join(file_string))
 
@@ -126,7 +140,8 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
                 row = f"""Failed case: {failed_case[0]}
                 \t     \tresult    \tground truth
                 \t  AP:\t{failed_case[1][0]}\t{failed_case[1][1]}
-                \tdate:\t{failed_case[2][0]}\t{failed_case[2][1]}"""
+                \tdate:\t{failed_case[2][0]}\t{failed_case[2][1]}
+                \ttime:\t{failed_case[3][0]}\t{failed_case[3][1]}"""
                 file_string.append(row)
             f.write(regression_test_header + '\n'.join(file_string))
 
@@ -141,6 +156,7 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
 def test_single(file_name, test_folder_path, use_gpu=False):
     # 936.jpg hard example working great
     # 924.jpg extreme segmentation
+    # 684.jpg 391.jpg 818.jpg low-res detection
 
     config.DEBUG = True
     config.VERBOSE = True
@@ -151,16 +167,43 @@ def test_single(file_name, test_folder_path, use_gpu=False):
         return
 
     extractor = ReceiptExtractor(use_gpu=use_gpu)
-
+    load_text_detection_nets()
 
     print(f'Processing {file_name}')
     image = cv2.imread(os.path.join(test_folder_path, file_name), 1)
 
-    t_start = time.time()
-    receipt = extractor.extract_receipt(image)
-    date, AP = receipt.get_date_and_AP()
+    print(f'image dimensions: {image.shape[1]}x{image.shape[0]}')
 
-    runtime = time.time()-t_start
+    t_start = chrono.time()
+    receipt = extractor.extract_receipt(image)
+    receipt.process()
+
+    if config.VERBOSE:
+        print('\tStart OCR...')
+
+    ocr_start = chrono.time()
+
+    AP = receipt.get_AP()
+    date = receipt.get_date()
+    time = receipt.get_time()
+
+    ocr_end = chrono.time()
+    runtime_ocr = (ocr_end-ocr_start)*1000
+
+    if config.VERBOSE:
+        print('\tbefore postprocess')
+        print(f'\t\tAP code: {receipt.raw_AP}')
+        print(f'\t\t   date: {receipt.raw_date}')
+        print(f'\t\t   time: {receipt.raw_time}')
+
+        print('\tafter postprocess')
+        print(f'\t\tAP code: {receipt.AP}')
+        print(f'\t\t   date: {receipt.date}')
+        print(f'\t\t   time: {receipt.time}')
+        
+        print(f'\tFinished OCR. ({runtime_ocr:.2f}ms)') # time
+
+    runtime = chrono.time()-t_start
     print(f'Receipt OCR full runtime: {runtime*1000:.2f}ms')
 
     cv2.waitKey(0)
@@ -185,6 +228,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+
+    if args.gpu:
+        config.GPU = True
 
     if args.single is not None:
         test_single(file_name=args.single, test_folder_path=args.test_path, use_gpu=args.gpu)
