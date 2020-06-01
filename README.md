@@ -4,7 +4,7 @@
 
 ---
 
-## Using the server
+## Using the server without docker
 
 ```bash
 python3 app/app.py
