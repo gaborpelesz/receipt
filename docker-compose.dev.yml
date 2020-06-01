@@ -9,3 +9,4 @@ services:
       - 3000:3000
     environment:
       FLASK_ENV: development
+      FLASK_DEBUG: 0

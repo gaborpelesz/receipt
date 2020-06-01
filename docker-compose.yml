@@ -3,7 +3,7 @@ version: "3.1"
 services:
   python:
     build: .
-    image: calvus/arbori:python
+    image: calvus/receipt:python
     restart: always
     ports:
       - 3000:3000
