@@ -12,7 +12,7 @@ from receipt.processing import Receipt
 from utils.rotate import rotate
 
 class ReceiptExtractor:
-    def __init__(self, segmentation_model_path='/home/peleszgabor/Desktop/projects/blokkos/alpha1.0/app/models/segmentation/resnet50_unet_20200318', use_gpu=False):
+    def __init__(self, segmentation_model_path='app/models/segmentation/resnet50_unet_20200318', use_gpu=False):
         gpus = tf.config.experimental.list_physical_devices('GPU')
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
