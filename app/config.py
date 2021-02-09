@@ -1,5 +1,5 @@
 DEBUG=False
-GPU=False
+GPU=True
 VERBOSE=False
 craftnet=None
 refinenet=None

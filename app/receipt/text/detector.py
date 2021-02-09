@@ -13,6 +13,7 @@ def load_text_detection_nets():
 
 def find_text(image, craftnet, refinenet, gpu: bool = False):
     text_images = []
+    found_text_boxes = []
 
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -55,8 +56,10 @@ def find_text(image, craftnet, refinenet, gpu: bool = False):
         position = (box[0] + box[2]) // 2 # center of the textbox on the image
 
         text_images.append((cropped_image, position))
+        found_text_boxes.append(box)
 
-    text_images.reverse()
+    if len(text_images) > 0:
+        text_images.reverse() # interesting fact that if len(text_images) == 0 so text_images = [], then text_images.reverse() is None!
 
     if config.DEBUG:
         for i, box in enumerate(prediction_result["boxes"]):
@@ -74,7 +77,7 @@ def find_text(image, craftnet, refinenet, gpu: bool = False):
         cv2.resizeWindow('text boxes', 1200,1000)
         cv2.imshow('text boxes', image)
 
-    return text_images
+    return text_images, found_text_boxes
 
 def crop_box(image, box):
     # get width and height of the detected rectangle

@@ -18,7 +18,7 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
         generate_regression_set=False):
     
     if not os.path.exists(test_folder_path):
-        print(f'{test_folder_path}: Test folder does not exist! Returning...')
+        print(f"{test_folder_path}: Test folder does not exist! Returning...")
         return
     if not os.path.exists(labels_path):
         print(f'{labels_path}: Labels file does not exist! Returning...')
@@ -171,6 +171,7 @@ def test_single(file_name, test_folder_path, use_gpu=False):
 
     print(f'Processing {file_name}')
     image = cv2.imread(os.path.join(test_folder_path, file_name), 1)
+    debug_image = image.copy() # creating the debug image for API response
 
     print(f'image dimensions: {image.shape[1]}x{image.shape[0]}')
 
@@ -186,6 +187,16 @@ def test_single(file_name, test_folder_path, use_gpu=False):
     AP = receipt.get_AP()
     date = receipt.get_date()
     time = receipt.get_time()
+
+    # Drawing the receipt outline
+    debug_image = extractor.draw_receipt_outline(debug_image)
+    # Drawing the text boxes
+    debug_image = receipt.draw_text_boxes(debug_image, extractor.rectangle_coords_of_receiptROI[0])
+
+    cv2.namedWindow('receipt corners debug', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('receipt corners debug', 1000, 1600)
+    cv2.imshow('receipt corners debug', debug_image)
+
 
     ocr_end = chrono.time()
     runtime_ocr = (ocr_end-ocr_start)*1000

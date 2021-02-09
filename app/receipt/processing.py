@@ -1,6 +1,7 @@
 import time
 import re
 import cv2
+import numpy as np
 
 import config
 from receipt.text import ocr
@@ -15,6 +16,16 @@ class Receipt():
 
         self.runtime_ocr = 0
         self.runtime_findtext = 0
+        self.text_images = None
+        self.found_text_boxes = None
+
+        self.raw_AP = None
+        self.raw_date = None
+        self.raw_time = None
+
+        self.AP_text_box = None
+        self.time_text_box = None
+        self.date_text_box = None
 
     def _post_process_AP(self, AP_code):
         if len(AP_code) < 8:
@@ -136,7 +147,7 @@ class Receipt():
         # Running text detection
         # text images are in the following format: (image, box_center_point)
         t0_textbox = time.time()
-        text_images = detector.find_text(image, config.craftnet, config.refinenet, config.GPU)
+        text_images, self.found_text_boxes = detector.find_text(image, config.craftnet, config.refinenet, config.GPU)
         td_textbox = time.time()
 
         self.runtime_findtext = (td_textbox-t0_textbox)*1000 # text detection runtime
@@ -157,10 +168,16 @@ class Receipt():
         self.AP = self.raw_AP = '?'
 
         # AP code is the first text image, most of the time 
-        AP_candidate_image = self.text_images[0][0]
+        AP_candidate = self.text_images[0]
+        AP_candidate_image = AP_candidate[0]
 
         if AP_candidate_image is None:
             return '?'
+
+        # save the text box of the date candidate for debug purposes
+        AP_text_box_top_left = (AP_candidate[1][0] - 1/2 * AP_candidate[0].shape[1], AP_candidate[1][1] - 1/2 * AP_candidate[0].shape[0])
+        AP_text_box_bottom_right = (AP_candidate[1][0] + 1/2 * AP_candidate[0].shape[1], AP_candidate[1][1] + 1/2 * AP_candidate[0].shape[0])
+        self.AP_text_box = AP_text_box_top_left, AP_text_box_bottom_right
 
         raw_AP = ocr.image_word_to_string(AP_candidate_image)
         self.raw_AP = raw_AP
@@ -203,6 +220,11 @@ class Receipt():
 
         if date_candidate_image is None:
             return '?'
+
+        # save the text box of the date candidate for debug purposes
+        date_text_box_top_left = (date_candidate[1][0] - 1/2 * date_candidate[0].shape[1], date_candidate[1][1] - 1/2 * date_candidate[0].shape[0])
+        date_text_box_bottom_right = (date_candidate[1][0] + 1/2 * date_candidate[0].shape[1], date_candidate[1][1] + 1/2 * date_candidate[0].shape[0])
+        self.date_text_box = date_text_box_top_left, date_text_box_bottom_right
 
         raw_date = ocr.image_word_to_string(date_candidate_image)
         self.raw_date = raw_date
@@ -248,12 +270,17 @@ class Receipt():
             candidates_filtered = filter(lambda candidate: candidate[1][0] > image_width // 2, candidates)
 
         # select the lowermost element from remaining candidates
-        # reversing needed because the lowermost element has the highest 'y' value
+        # list reversing needed because the lowermost element has the highest 'y' value
         time_candidate = sorted(candidates_filtered, key=lambda candidate: candidate[1][1], reverse=True)[0]
         time_candidate_image = time_candidate[0]
 
         if time_candidate_image is None:
             return '?'
+
+        # save the text box of the time candidate for debug purposes
+        time_text_box_top_left = (time_candidate[1][0] - 1/2 * time_candidate[0].shape[1], time_candidate[1][1] - 1/2 * time_candidate[0].shape[0])
+        time_text_box_bottom_right = (time_candidate[1][0] + 1/2 * time_candidate[0].shape[1], time_candidate[1][1] + 1/2 * time_candidate[0].shape[0])
+        self.time_text_box = time_text_box_top_left, time_text_box_bottom_right
 
         raw_time = ocr.image_word_to_string(time_candidate_image)
         self.raw_time = raw_time
@@ -265,3 +292,25 @@ class Receipt():
             cv2.imshow('time candidate', time_candidate_image)
 
         return self.time
+
+    def draw_text_boxes(self, debug_image, offset=(0,0)):
+        """Return with an opencv image, where we have drawn the found text boxes 
+        onto the receipt."""
+        if self.found_text_boxes is None:
+            print("draw_text_boxes: No text found or estimation wasn't run till now, so returning with the parameter image")
+            return debug_image
+
+        for text_box in self.found_text_boxes:
+            # get the top-left and bottom-right coords and shift them with the offset
+            box_rectangle_coords = [(int(point[0])+offset[0], int(point[1])+offset[1]) for point in [np.min(text_box, axis=0), np.max(text_box, axis=0)]]
+            debug_image = cv2.rectangle(debug_image, box_rectangle_coords[0], box_rectangle_coords[1], (0,255,255), 10)
+
+        # draw the text boxes onto the debug_image
+        shifted_AP_box = [(int(point[0])+offset[0], int(point[1])+offset[1]) for point in self.AP_text_box]
+        shifted_date_box = [(int(point[0])+offset[0], int(point[1])+offset[1]) for point in self.date_text_box]
+        shifted_time_box = [(int(point[0])+offset[0], int(point[1])+offset[1]) for point in self.time_text_box]
+        debug_image = cv2.rectangle(debug_image, shifted_AP_box[0], shifted_AP_box[1], (0,255,0), 10)
+        debug_image = cv2.rectangle(debug_image, shifted_date_box[0], shifted_date_box[1], (0,255,0), 10)
+        debug_image = cv2.rectangle(debug_image, shifted_time_box[0], shifted_time_box[1], (0,255,0), 10)
+
+        return debug_image

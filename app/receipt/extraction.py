@@ -25,6 +25,10 @@ class ReceiptExtractor:
         # warmup neural network, if not, the first prediction would be slow
         self._warmup()
 
+        self.original_image = None
+        self.receipt_corner_estimates = None
+        self.rectangle_coords_of_receiptROI = None
+
     def _warmup(self):
         warmup_image = cv2.imread('app/models/warmup/warmup.jpg', 1)
         _ = predict(model=self.model, image=warmup_image)
@@ -57,6 +61,7 @@ class ReceiptExtractor:
         """Finds and extracts a receipt, from an image.
         """
         cropped_receipt = None
+        self.original_image = image
 
         if self.is_scanned(image):
             if config.VERBOSE:
@@ -98,6 +103,7 @@ class ReceiptExtractor:
         biggest_contour = sorted(contours, key=lambda x: cv2.contourArea(x))[-1]
 
         corners = self.estimate_corners(biggest_contour)
+        self.receipt_corner_estimates = corners
 
         center, _, angle = cv2.minAreaRect(corners)
 
@@ -114,6 +120,7 @@ class ReceiptExtractor:
         smoothed_image = cv2.bitwise_and(rotated_image[y:y+h,x:x+w], rotated_mask)
 
         # If width is greater than height we rotate 90 clockwise
+        # although it could have been a 90 anti-clockwise rotation...
         if smoothed_image.shape[1] > smoothed_image.shape[0]:
             smoothed_image = rotate([smoothed_image], 90)[0]
 
@@ -166,6 +173,26 @@ class ReceiptExtractor:
 
         return approx
 
+    def draw_receipt_outline(self, debug_image):
+        """Return with an opencv image, where we have drawn the estimated 
+            receipt corners and the border of the receipt."""
+        if self.receipt_corner_estimates is None:
+            print("draw_receipt_corners: No receipt corner estimates were specified, so returning parameter image.")
+            return self.debug_image
+
+        # Drawing the outline of the receipt
+        debug_image = cv2.polylines(debug_image, [self.receipt_corner_estimates], True, (0,0,255), 10, cv2.LINE_AA)
+
+        # Drawing the area of interest, the 1/4 rectangle of the receipt
+        rectangle_topleft = np.min(self.receipt_corner_estimates, axis=0)
+        rectangle_bottomright = np.max(self.receipt_corner_estimates, axis=0)
+        rectangle_topleft[1] += (3/4) * (rectangle_bottomright[1] - rectangle_topleft[1]) # moving the topleft coordinate down so the rectangle takes 1/4 of the receipt
+        cv2.rectangle(debug_image, tuple(rectangle_topleft), tuple(rectangle_bottomright), (255,255,0), 10)
+
+        self.rectangle_coords_of_receiptROI = [tuple(rectangle_topleft), tuple(rectangle_bottomright)]
+
+        return debug_image
+
 # ligthweight implementation of keras_segmentation predict function
 def predict(model=None , image=None , out_fname=None):
     output_width = model.output_width
@@ -176,6 +203,7 @@ def predict(model=None , image=None , out_fname=None):
 
     x = get_image_array( image , input_width  , input_height , ordering=IMAGE_ORDERING )
     pr = model.predict( np.array([x]) )[0]
+
     pr = pr.reshape(( output_height ,  output_width , n_classes ) ).argmax( axis=2 )
 
     return pr

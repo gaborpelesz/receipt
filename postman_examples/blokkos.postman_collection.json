@@ -1,0 +1,46 @@
+{
+	"info": {
+		"_postman_id": "a3bd842c-de25-4ade-94b1-1606fbb7a80d",
+		"name": "Receipt processing API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Process receipt",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "image",
+							"type": "file",
+							"src": "/home/peleszgabor/Desktop/projects/blokkos/research_and_data/segmentation/keras/data/test/314.jpg"
+						}
+					],
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/process_receipt",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"process_receipt"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"protocolProfileBehavior": {}
+}
