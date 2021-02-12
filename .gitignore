@@ -2,8 +2,9 @@
 classified_test_results
 test_results
 
-# config file
-config.py
+# pipenv related development stuff
+Pipfile
+Pipfile.lock
 
 # exclude models
 models
