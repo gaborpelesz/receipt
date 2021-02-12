@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install tesseract-ocr -y
 
 # installing app
 COPY ./app /app
+COPY ./requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip==20.2.3
 RUN pip3 install --trusted-host pypi.python.org -r /app/requirements.txt
