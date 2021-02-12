@@ -1,5 +1,7 @@
 # Project Blokkos: Receipt Detection and OCR
 
+# README is DEPRECATED! Any of the below mentioned procedures might have several issues.
+
 ## Installation
 
 Put the entire `models` folder under the app folder (app/models).  
