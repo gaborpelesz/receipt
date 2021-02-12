@@ -22,14 +22,6 @@ run:
 # Run on GPU
 run-gpu:
 	docker run -it --rm --gpus all -p 3000:3000 blokkosvision:latest
-
-# Run developement environment (make run with docker-compose.dev.yml)
-dev:
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --force-recreate -d $(SERVICES)
-
-# Get into the python service's container shell
-exec:
-	docker-compose exec python sh
 	
 # Turn down running docker-compose services
 down:
