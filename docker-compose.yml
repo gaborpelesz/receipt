@@ -2,8 +2,23 @@ version: "3.1"
 
 services:
   python:
-    build: .
-    image: registry.digitalocean.com/calv-hub/blokkos:python
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: blokkosvision:latest
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+              - gpu
     restart: always
     ports:
       - 3000:3000
+    environment:
+      FLASK_ENV: production
+      FLASK_DEBUG: 0
+      RECEIPT_PROCESS_GPU: "True"
+      RECEIPT_PROCESS_DEBUG: "False"
+      RECEIPT_PROCESS_VERBOSE: "False"
