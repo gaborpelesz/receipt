@@ -1,16 +1,17 @@
 import time
 import io
 import sys
-from flask import Flask, request, jsonify, make_response
-from flask_api import FlaskAPI, status
-import cv2
-import numpy as np
 import base64
 
-from receipt.extraction import ReceiptExtractor
-from receipt.text.detector import load_text_detection_nets
+import cv2
+import numpy as np
+from flask import Flask, request, jsonify, make_response
+from flask_api import FlaskAPI, status
+
+from receipt.segmentation.extraction import ReceiptExtractor
+from receipt.text_detection.detector import load_text_detection_nets
+
 import config
-from utils import base64_image_converter
 
 app = FlaskAPI(__name__)
 load_text_detection_nets()

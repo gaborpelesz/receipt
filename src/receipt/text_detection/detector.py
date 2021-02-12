@@ -3,7 +3,7 @@ import numpy as np
 import pytesseract
 
 import config
-from utils.rotate import rotate
+from receipt.utils.rotate import rotate
 
 import craft_text_detector as craft
 

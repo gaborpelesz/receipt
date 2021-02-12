@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 
 import config
-from receipt.text import ocr
-from receipt.text import detector
+from receipt.ocr import tesseract as ocr
+from receipt.text_detection import detector
 
 import craft_text_detector as craft
 
