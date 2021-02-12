@@ -12,7 +12,7 @@ from receipt.processing import Receipt
 from utils.rotate import rotate
 
 class ReceiptExtractor:
-    def __init__(self, segmentation_model_path='app/models/segmentation/resnet50_unet_20200318', use_gpu=False):
+    def __init__(self, segmentation_model_path='src/models/segmentation/resnet50_unet_20200318', use_gpu=False):
         gpus = tf.config.experimental.list_physical_devices('GPU')
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
@@ -30,7 +30,7 @@ class ReceiptExtractor:
         self.rectangle_coords_of_receiptROI = None
 
     def _warmup(self):
-        warmup_image = cv2.imread('app/models/warmup/warmup.jpg', 1)
+        warmup_image = cv2.imread('src/models/warmup/warmup.jpg', 1)
         _ = predict(model=self.model, image=warmup_image)
 
     def is_scanned(self, image):

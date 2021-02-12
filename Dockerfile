@@ -60,7 +60,7 @@ RUN wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
 RUN apt-get update && apt-get install tesseract-ocr -y
 
 # installing app
-COPY ./app /app
+COPY ./src /app
 COPY ./requirements.txt /app/requirements.txt
 
 RUN pip3 install --upgrade pip==20.2.3
@@ -72,11 +72,11 @@ RUN pip3 install -U opencv-python==4.2.0.34
 
 # installing models
 RUN mkdir $HOME/.craft_text_detector && mkdir $HOME/.craft_text_detector/weights
-RUN mv ./app/models/craft/craft_mlt_25k.pth $HOME/.craft_text_detector/weights
-RUN mv ./app/models/craft/craft_refiner_CTW1500.pth $HOME/.craft_text_detector/weights
+RUN mv ./src/models/craft/craft_mlt_25k.pth $HOME/.craft_text_detector/weights
+RUN mv ./src/models/craft/craft_refiner_CTW1500.pth $HOME/.craft_text_detector/weights
 
 RUN mkdir $HOME/.keras && mkdir $HOME/.keras/datasets
-RUN mv ./app/models/backbones/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5 $HOME/.keras/datasets
+RUN mv ./src/models/backbones/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5 $HOME/.keras/datasets
 
 # server settings
 ENV FLASK_ENV=production
