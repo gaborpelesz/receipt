@@ -82,4 +82,4 @@ RUN mv ./src/models/backbones/resnet50_weights_tf_dim_ordering_tf_kernels_notop.
 ENV FLASK_ENV=production
 ENV FLASK_DEBUG=0
 
-CMD [ "python3", "/app/app.py" ]
+CMD [ "python3", "/app/main.py" ]
