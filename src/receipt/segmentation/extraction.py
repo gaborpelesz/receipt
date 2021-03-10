@@ -29,9 +29,49 @@ class ReceiptExtractor:
         self.receipt_corner_estimates = None
         self.rectangle_coords_of_receiptROI = None
 
+        self.kernel_5x5 = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+
     def _warmup(self):
         warmup_image = cv2.imread('models/warmup/warmup.jpg', 1)
         _ = predict(model=self.model, image=warmup_image)
+
+    def extract_receipt(self, image):
+        """Finds and extracts a receipt, from an image.
+        """
+        self.original_image = image
+        cropped_receipt = None
+
+        if self.is_scanned(image):
+            if config.VERBOSE:
+                print("\tThe image looks like it was scanned.")
+                print("\tText search based receipt extraction begins...")
+            cropped_receipt = self._extract_by_text_search(image)
+        else:
+            t0_segment = time.time()
+            if config.VERBOSE:
+                print("\tReceipt segmentation with U-net begins...")
+
+            cropped_receipt = self._extract_by_unet(image)
+
+            td_segment = time.time()
+            self.runtime_segment = (td_segment-t0_segment)*1000
+            if config.VERBOSE:
+                print(f"\tFinished segmentation. ({self.runtime_segment:.2f}ms)")
+
+        if config.DEBUG:
+            cv2.namedWindow('original', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('original', 1200, 1000)
+            cv2.imshow('original', image)
+            cv2.namedWindow('segmented', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('segmented', 1200, 1000)
+            cv2.imshow('segmented', cropped_receipt)
+
+        # TODO, we might just return the cropped receipt
+        # and do the Receipt object instantiation outside
+        if cropped_receipt is None:
+            return None
+
+        return Receipt(cropped_receipt) # create a new Receipt object
 
     def is_scanned(self, image):
         """Determines if an image is scanned or not.
@@ -57,58 +97,70 @@ class ReceiptExtractor:
         else:
             return False
 
-    def extract_receipt(self, image):
-        """Finds and extracts a receipt, from an image.
+    def _extract_by_unet(self, image):
+        """Extraction based on the U-Net segmented image. This step
+        aims to segment the hole receipt from the image. 
+        
+        Returns:
+            - 'None' if no receipt were found during the extraction
+            - else the rotated and extracted 'image' of the found receipt. 
+              At this stage we assume that the image truly contains a receipt 
+              or a receipt-like object that we couldn't distinguish from a real one.
         """
-        cropped_receipt = None
-        self.original_image = image
+        segmentation_mask = self._unet_segment(image)
 
-        if self.is_scanned(image):
-            if config.VERBOSE:
-                print("\tThe image looks like it was scanned.")
-                print("\tText search based receipt extraction begin...")
-            cropped_receipt = self._extract_by_text_search(image)
-        else:
-            t0_segment = time.time()
-            if config.VERBOSE:
-                print("\tReceipt segmentation with U-net begins...")
-            cropped_receipt = self._extract_by_segment(image)
-            td_segment = time.time()
-            self.runtime_segment = (td_segment-t0_segment)*1000
-            if config.VERBOSE:
-                print(f"\tFinished segmentation. ({self.runtime_segment:.2f}ms)")
-
-        if config.DEBUG:
-            cv2.namedWindow('original', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('original', 1200, 1000)
-            cv2.imshow('original', image)
-            cv2.namedWindow('segmented', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('segmented', 1200, 1000)
-            cv2.imshow('segmented', cropped_receipt)
-
-        return Receipt(cropped_receipt) # create a new Receipt object
-
-    def _extract_by_segment(self, image):
-        """Extraction based on the segmented image. Segmentation
-        aims to segment the hole receipt from the image. At this stage
-        we assume that the image truly contains a receipt, with a distinct
-        background.
-        """
-        t_start = time.time()
-
-        segmentation_mask = self._segment_image(image)
+        # reduce noise, try to disconnect close artifacts from the receipt
+        segmentation_mask = cv2.erode(segmentation_mask, self.kernel_5x5, iterations=5)
+        segmentation_mask = cv2.dilate(segmentation_mask, self.kernel_5x5, iterations=5)
 
         contours, _ = cv2.findContours(segmentation_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # No contours found
+        if contours is None or len(contours) == 0:
+            return None
+
         # Our best guess here is to operate with the biggest contour
-        biggest_contour = sorted(contours, key=lambda x: cv2.contourArea(x))[-1]
+        biggest_contour = None
+        biggest_contour_area = 0
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            if area > biggest_contour_area:
+                biggest_contour = contour
+                biggest_contour_area = area
 
-        corners = self.estimate_corners(biggest_contour)
-        self.receipt_corner_estimates = corners
+        contour_image_ratio = biggest_contour_area / (segmentation_mask.shape[0]*segmentation_mask.shape[1])
 
-        center, _, angle = cv2.minAreaRect(corners)
+        # There aren't any receipts (artifacts) or the receipt is too small on the image.
+        if contour_image_ratio < 0.1:
+            return None
+
+        # If the contour is above 90% of the image we think of it as the receipt
+        # covers most of the image and it might be distorted in all sorts of ways
+        # If it does not cover 90%, we need another step of confirmation which is
+        # checking the number of corners in order to eliminate irregular shapes
+        if contour_image_ratio < 0.9:
+            num_corners_lower_bound  = len(self.estimate_corners(biggest_contour, 0.01))
+            num_corners_upper_bound  = len(self.estimate_corners(biggest_contour, 0.04))
+
+            if num_corners_upper_bound <= 3 or num_corners_upper_bound >= 7:
+                return None
+            if num_corners_lower_bound - num_corners_upper_bound >= 10:
+                return None
+
+        # 0.015 is a good corner estimation value
+        # there are cases where we don't want the 4 point rectangular shape
+        # for example cases where the receipt is bending and might be 6 points,
+        # and we want to minimize the background so we are extraction along those 6.
+        # Little artifacts can also cause unwanted corners, but we might can still
+        # process the receipt extracting relevant text info
+        self.receipt_corner_estimates = self.estimate_corners(biggest_contour, 0.015)
+
+        # TODO, if we have 4 corners, DO 4 point transform. Else do the usual below.
+
+        center, _, angle = cv2.minAreaRect(self.receipt_corner_estimates)
 
         smoothed_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-        cv2.drawContours(smoothed_mask, [cv2.convexHull(corners)], -1, 255, -1)
+        cv2.drawContours(smoothed_mask, [cv2.convexHull(self.receipt_corner_estimates)], -1, 255, -1)
 
         rotated_image, rotated_mask = rotate([image, smoothed_mask], 270-angle, center)
 
@@ -124,24 +176,9 @@ class ReceiptExtractor:
         if smoothed_image.shape[1] > smoothed_image.shape[0]:
             smoothed_image = rotate([smoothed_image], 90)[0]
 
-
-        # TODO remove debug code below
-        # print(f'Runtime: {(time.time()-t_start)*1000:.3f}ms')
-        # window_size = (1500,1500)
-        # cv2.namedWindow('show', cv2.WINDOW_NORMAL)
-        # cv2.resizeWindow('show', window_size)
-        # cv2.imshow('show', image)
-        # cv2.namedWindow('smoothed_image', cv2.WINDOW_NORMAL)
-        # cv2.resizeWindow('smoothed_image', window_size)
-        # cv2.imshow('smoothed_image', smoothed_image)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
         return smoothed_image
 
-
-
-    def _segment_image(self, image_to_segment):
+    def _unet_segment(self, image_to_segment):
         original_height, original_width = image_to_segment.shape[0], image_to_segment.shape[1] 
 
         # Making the prediction over the image with the trained model
@@ -154,11 +191,15 @@ class ReceiptExtractor:
         # Upscale
         seg_img = cv2.resize(seg_img, (original_width, original_height))
 
+        # after upscale the image won't be binary and gray shaded artifacts appear
+        # to compensate thresholding at 254 is okay
+        _, seg_img = cv2.threshold(seg_img, 254, 255, cv2.THRESH_BINARY)
+
         return seg_img
 
     def _extract_by_text_search(self, image):
         # TODO implement text extraction
-        return image
+        return None
 
     # TODO not sure perspective transform is needed yet
     def perspective_transform(self):
@@ -166,12 +207,10 @@ class ReceiptExtractor:
         """
         pass
 
-    def estimate_corners(self, cnt):
-        epsilon = 0.01*cv2.arcLength(cnt,True)
-        approx = cv2.approxPolyDP(cnt,epsilon,True)
-        approx = np.array([a[0] for a in approx])
-
-        return approx
+    def estimate_corners(self, cnt, eps=0.01):
+        epsilon = eps * cv2.arcLength(cnt, closed=True)
+        approx = cv2.approxPolyDP(cnt, epsilon, closed=True)
+        return approx.reshape((approx.shape[0], approx.shape[2]))
 
     def draw_receipt_outline(self, debug_image):
         """Return with an opencv image, where we have drawn the estimated 
