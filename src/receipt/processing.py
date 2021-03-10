@@ -145,9 +145,9 @@ class Receipt():
             print('\tFind textboxes...')
         
         # Running text detection
-        # text images are in the following format: (image, box_center_point)
+        # 'text_images' are in the following format: (image, box_center_point)
         t0_textbox = time.time()
-        text_images, self.found_text_boxes = detector.find_text(image, config.craftnet, config.refinenet, config.GPU)
+        result = detector.find_text(image, config.craftnet, config.refinenet, config.GPU)
         td_textbox = time.time()
 
         self.runtime_findtext = (td_textbox-t0_textbox)*1000 # text detection runtime
@@ -156,10 +156,12 @@ class Receipt():
             print(f'\tTextboxes found. ({self.runtime_findtext:.2f}ms)')
 
         # no text boxes found
-        if len(text_images) == 0:
-            return "?", "?"
+        if result is None or len(result[0]) == 0:
+            return False
 
-        self.text_images = text_images
+        self.text_images, self.found_text_boxes = result
+
+        return True
 
     def get_AP(self):
         if self.text_images is None or len(self.text_images) == 0:

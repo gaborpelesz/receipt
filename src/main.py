@@ -30,27 +30,17 @@ def process_receipt():
         image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), -1)
         print(f'Decoding completed. ({(time.time()-t0_decode)*1000:.2f}ms)')
 
-
         print('Extracting receipt from image...')
         t0_extraction = time.time()
         receipt = extractor.extract_receipt(image)
         print(f'Extraction completed. ({(time.time()-t0_extraction)*1000:.2f}ms)')
 
         if receipt is None:
-            return jsonify(
-                status='Success',
-                status_message='Receipt not found on the image.',
-                receipt={
-                    'AP': '?',
-                    'date': '?',
-                    'time': '?'
-                },
-                runtime=f'{(time.time()-start_time)*1000:.2f}ms'
-            ), status.HTTP_404_NOT_FOUND
+            return notfound_receipt((time.time()-start_time)*1000)
 
         print('Processing the receipt...')
         t0_processing = time.time()
-        receipt.process()
+        result = receipt.process()
         print(f'Processing completed. ({(time.time()-t0_processing)*1000:.2f}ms)')
 
         print('Extraction of predefined fields...')
@@ -60,16 +50,7 @@ def process_receipt():
             receipt_time = receipt.get_time()
         except Exception as e:
             print(e, file=sys.stderr)
-            return jsonify(
-                status='Success',
-                status_message='Receipt not found on the image.',
-                receipt={
-                        'AP': '?',
-                        'date': '?',
-                        'time': '?'
-                },
-                runtime=f'{(time.time()-start_time)*1000:.2f}ms'
-            ), status.HTTP_404_NOT_FOUND
+            return notfound_receipt((time.time()-start_time)*1000)
         print('Extraction of AP, date, time completed.')
 
         # if API asked, create debug image
@@ -103,7 +84,6 @@ def process_receipt():
             print(e, file=sys.stderr)
             print("Tried but exception occured.", file=sys.stderr)
 
-
         return jsonify(
             status='Success',
             status_message='Successful processing of the receipt on the image.',
@@ -130,6 +110,18 @@ def process_receipt():
         status='Failed',
         status_message='Unknown internal server error. Please save the configuration and contact gaborpelesz@gmail.com'
     ), status.HTTP_500_INTERNAL_SERVER_ERROR
+
+def notfound_receipt(runtime=0):
+    return jsonify(
+                status='Failed',
+                status_message='Receipt not found on the image.',
+                receipt={
+                    'AP': '?',
+                    'date': '?',
+                    'time': '?'
+                },
+                runtime=f'{runtime:.2f}ms'
+            ), status.HTTP_404_NOT_FOUND
 
 if __name__ == '__main__':
     # threaded=false because if not, Flask would lock threads before tensorflow
