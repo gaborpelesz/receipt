@@ -7,8 +7,8 @@ import cv2
 import numpy as np
 
 import config
-from receipt.extraction import ReceiptExtractor
-from receipt.text.detector import load_text_detection_nets
+from receipt.segmentation.extraction import ReceiptExtractor
+from receipt.text_detection.detector import load_text_detection_nets
 
 
 def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_and_data/data/testing/test_set', 
@@ -69,6 +69,10 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
 
         try:
             receipt = extractor.extract_receipt(image)
+
+            if receipt is None:
+                continue
+
             receipt.process()
 
             runtime_ocr_t0 = chrono.time()
@@ -117,6 +121,9 @@ def test(test_folder_path='/home/peleszgabor/Desktop/projects/blokkos/research_a
             statistics_print += "\nAll regression tests were successful.\n\n"
     else:
         statistics_print += "\n\n"
+
+    if not os.path.exists('./test_results'):
+        os.mkdir('./test_results')
 
     os.mkdir(f'./test_results/{test_result_file_name}')
 
@@ -224,11 +231,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Test recognition')
 
     parser.add_argument('-S', '--single', type=str, help='Test a specific image.')
-    parser.add_argument('--test-path', type=str, default='/home/peleszgabor/Desktop/projects/blokkos/research_and_data/data/testing/test_set',
+    parser.add_argument('--test-path', type=str, default='/home/pelesz/Desktop/work/blokkos/research_and_data/data/testing/test_set',
         help='The path to the folder, where the test files are stored')
-    parser.add_argument('--labels-path', type=str, default='/home/peleszgabor/Desktop/projects/blokkos/research_and_data/data/testing/test_labels.csv',
+    parser.add_argument('--labels-path', type=str, default='/home/pelesz/Desktop/work/blokkos/research_and_data/data/testing/test_labels.csv',
         help='The path to the file, where the corresponding test labels are stored.')
-    parser.add_argument('--regression-path', type=str, default='/home/peleszgabor/Desktop/projects/blokkos/research_and_data/data/testing/regression_test_set.txt',
+    parser.add_argument('--regression-path', type=str, default='/home/pelesz/Desktop/work/blokkos/research_and_data/data/testing/regression_test_set.txt',
         help='The path to the file, where the regression test image names are stored.')
     parser.add_argument('-R', '--test-regression', action='store_true', default=False, help='Wether to test against the regression test.')
     parser.add_argument('--gpu', action='store_true', default=False, help='Wether to use gpu for segmentation.')

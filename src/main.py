@@ -36,7 +36,7 @@ def process_receipt():
         print(f'Extraction completed. ({(time.time()-t0_extraction)*1000:.2f}ms)')
 
         if receipt is None:
-            return notfound_receipt((time.time()-start_time)*1000)
+            return notfound((time.time()-start_time)*1000)
 
         print('Processing the receipt...')
         t0_processing = time.time()
@@ -44,13 +44,21 @@ def process_receipt():
         print(f'Processing completed. ({(time.time()-t0_processing)*1000:.2f}ms)')
 
         print('Extraction of predefined fields...')
+        couldnt_read = False
         try:
             receipt_AP = receipt.get_AP()
             receipt_date = receipt.get_date()
             receipt_time = receipt.get_time()
+
+            if '???' == receipt_AP+receipt_date+receipt_time:
+                couldnt_read = True
         except Exception as e:
             print(e, file=sys.stderr)
-            return notfound_receipt((time.time()-start_time)*1000)
+            couldnt_read = True
+
+        if couldnt_read: 
+            return notfound("Couldn't read the receipt.", (time.time()-start_time)*1000)
+        
         print('Extraction of AP, date, time completed.')
 
         # if API asked, create debug image
@@ -111,10 +119,10 @@ def process_receipt():
         status_message='Unknown internal server error. Please save the configuration and contact gaborpelesz@gmail.com'
     ), status.HTTP_500_INTERNAL_SERVER_ERROR
 
-def notfound_receipt(runtime=0):
+def notfound(status_message='Receipt not found on the image.', runtime=0):
     return jsonify(
                 status='Failed',
-                status_message='Receipt not found on the image.',
+                status_message=status_message,
                 receipt={
                     'AP': '?',
                     'date': '?',

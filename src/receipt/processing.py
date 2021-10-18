@@ -29,7 +29,7 @@ class Receipt():
 
     def _post_process_AP(self, AP_code):
         if len(AP_code) < 8:
-            return AP_code
+            return '?'
         
         post_processed = AP_code
         post_processed = post_processed.replace('d', '0')
@@ -75,6 +75,10 @@ class Receipt():
         if post_processed[:3] == '060': post_processed = '064' + post_processed[3:] # 064 for ROSSMANN, 060 for MOL
         if post_processed[:3] == '034': post_processed = '064' + post_processed[3:] # there isn't any machine with 034 AP
 
+        # still has not numeric?
+        if not post_processed.isnumeric():
+            return '?'
+
         return 'A' + post_processed
 
     def _post_process_date(self, date):
@@ -88,12 +92,12 @@ class Receipt():
         date_candidate = re.findall('([0-9]{0,2})', post_processed)
 
         if date_candidate is None:
-            return post_processed
+            return '?'
 
         date_candidate = [i for i in date_candidate if i] # remove empty strings
 
         if len(date_candidate) < 3:
-            return post_processed
+            return '?'
 
         date_candidate = date_candidate[-3:]
 
@@ -116,12 +120,12 @@ class Receipt():
         time_candidate = re.findall('([0-9]{0,2})', post_processed)
 
         if time_candidate is None:
-            return post_processed
+            return '?'
 
         time_candidate = [i for i in time_candidate if i] # remove empty strings
 
         if len(time_candidate) < 2:
-            return post_processed
+            return '?'
 
         # hour post process
         if len(time_candidate[0]) == 2:
@@ -176,14 +180,16 @@ class Receipt():
         if AP_candidate_image is None:
             return '?'
 
-        # save the text box of the date candidate for debug purposes
+        # save the text box of the ap candidate for debug purposes
         AP_text_box_top_left = (AP_candidate[1][0] - 1/2 * AP_candidate[0].shape[1], AP_candidate[1][1] - 1/2 * AP_candidate[0].shape[0])
         AP_text_box_bottom_right = (AP_candidate[1][0] + 1/2 * AP_candidate[0].shape[1], AP_candidate[1][1] + 1/2 * AP_candidate[0].shape[0])
         self.AP_text_box = AP_text_box_top_left, AP_text_box_bottom_right
 
         raw_AP = ocr.image_word_to_string(AP_candidate_image)
         self.raw_AP = raw_AP
-        self.AP = self._post_process_AP(raw_AP)
+
+        if self.raw_AP is not None:
+            self.AP = self._post_process_AP(raw_AP)
 
         if config.DEBUG:
             cv2.namedWindow('ap candidate', cv2.WINDOW_NORMAL)
